@@ -2689,8 +2689,17 @@ W8=Wait...
 7K=Sick:-D Laugher
 """
 
+CONTRACTION_PATTERNS = [ (r'won\'t', 'will not'), (r'can\'t', 'cannot'), (r'i\'m', 'i am'), 
+                        (r'ain\'t', 'is not'), (r'(\w+)\'ll', '\g<1> will'), (r'(\w+)n\'t', '\g<1> not'),
+                        (r'(\w+)\'ve', '\g<1> have'), (r'(\w+)\'s', '\g<1> is'), 
+                        (r'(\w+)\'re', '\g<1> are'), (r'(\w+)\'d', '\g<1> would'), 
+                        (r'&', 'and'), (r'dammit', 'damn it'), (r'dont', 'do not'), 
+                        (r'wont', 'will not') ]
+
+
 import nltk, string, re, os, time, pandas as pd, numpy as np
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet
 nltk.download('stopwords')
 from nltk.tokenize import (sent_tokenize, word_tokenize, RegexpTokenizer)
 nltk.download('punkt')
@@ -2699,45 +2708,98 @@ nltk.download('wordnet')
 from collections import Counter
 from bs4 import BeautifulSoup
 
+
 def clean_data(data):
     data['Review'] = data['Review'].astype(str)
-    # 1. Lower casing & replace Emails with emailaddress
+    # Duplication controll
+    data = data.drop_duplicates(keep='first')
+    # Lower casing & replace Emails with emailaddress
     data['Review'] = data['Review'].str.lower()
-    data['Review'] = data['Review'].str.replace(r'^.+@[^\.].*\.[a-z]{2,}$', 'emailaddress')
-    # 2. Removing Punctuations
+    #data['Review'] = data['Review'].str.replace(r'^.+@[^\.].*\.[a-z]{2,}$', 'emailaddress')
+    # Removing Punctuations
     data['Review'] = data['Review'].apply(lambda text: remove_punctuations(text))
-    # 3. Removing Stopwords
+    # Removing Contractions (what's --> what is, won't --> will not)
+    data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
+    # Replacing Negotiations with Antonmys (not able --> unable)
+    data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
+    # Handle Capitalized Words (use when text not converted to LowerCase)
+    #data['Review'] = data['Review'].apply(lambda text: handle_capitalized_words(text))
+    # Removing Stopwords
     data['Review'] = data['Review'].apply(lambda text: remove_stopwords(text))
-    # 4. Removing Frequent Words
+    # Removing Frequent Words
     data['Review'] = data['Review'].apply(lambda text: remove_freq_words(text))
-    # 5. Removing Rare Words
-    data['Review'] = data['Review'].apply(lambda text: remove_rare_words(text))
-    # 6. Stemming
-    data['Review'] = data['Review'].apply(lambda text: stem_words(text))
-    # 7. Lemmatization
-    data['Review'] = data['Review'].apply(lambda text: lemmatize_words(text))
-    # 8. Removing Emojis
-    data['Review'] = data['Review'].apply(lambda text: remove_emojis(text))
-    # 9. Converting Emojis
+    # Removing Rare Words
+    #data['Review'] = data['Review'].apply(lambda text: remove_rare_words(text))
+    # Stemming
+    #data['Review'] = data['Review'].apply(lambda text: stem_words(text))
+    # Lemmatization
+    #data['Review'] = data['Review'].apply(lambda text: lemmatize_words(text))
+    # Removing Emojis
+    #data['Review'] = data['Review'].apply(lambda text: remove_emojis(text))
+    # Converting Emojis
     data['Review'] = data['Review'].apply(lambda text: convert_emojis(text))
-    # 10. Removing Emoticons
-    data['Review'] = data['Review'].apply(lambda text: remove_emoticons(text))
-    # 11. Converting Emoticons
+    # Removing Emoticons
+    #data['Review'] = data['Review'].apply(lambda text: remove_emoticons(text))
+    # Converting Emoticons
     data['Review'] = data['Review'].apply(lambda text: convert_emoticons(text))
-    # 12. Removing URL's
+    # Removing URL's
     data['Review'] = data['Review'].apply(lambda text: remove_urls(text))
-    # 13. Removing HTML tags
+    # Removing HTML tags
     data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_re(text))
     #data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_BeautifulSoup(text))
-    # 14. Converting Chat words
+    # Converting Chat words
     data['Review'] = data['Review'].apply(lambda text: convert_chat_words(text))
-    # 15. Spelling Correction
+    # Spelling Correction
     
     return data
 
 def remove_punctuations(text):
     PUNCT_TO_REMOVE = string.punctuation
     return text.translate(str.maketrans('','',PUNCT_TO_REMOVE))
+
+def remove_contractions(text):
+    patterns = [(re.compile(regex), repl) for (regex, repl) in CONTRACTION_PATTERNS]
+    for (pattern, repl) in patterns:
+        (text, count) = re.subn(pattern, repl, text)
+    return text
+
+def replace_negations(text):
+    i, l = 0, len(text)
+    words = []
+    while i < l:
+        word = text[i]
+        if word == 'not' and i+1 < l:
+            ant = replace_to_antonym(text[i+1])
+            if ant:
+                words.append(ant)
+                i += 2
+                continue
+        words.append(word)
+        i += 1
+    return words
+
+def replace_to_antonym(word, pos = None):
+    antonyms = set()
+    for syn in wordnet.synsets(word, pos = pos):
+        for lemma in syn.lemmas():
+            for antonym in lemma.antonyms():
+                antonyms.add(antonym.name())
+    if len(antonyms) == 1:
+        return antonyms.pop()
+    else:
+        return None
+    
+def handle_capitalized_words(text):
+    words = word_tokenize(text)
+    final_text = []
+    for word in words:
+        if(len(re.findall("[A-Z]{3,}", word))):
+            word = word.replace('\\', '' )
+            transformed_word = re.sub("[A-Z]{3,}", "ALL_CAPS_"+word, word)
+            final_text.append(transformed_word)
+        else:
+            final_text.append(transformed_word)
+    return " ".join(final_text)
 
 def remove_stopwords(text):
     STOPWORDS = set(stopwords.words("english"))
@@ -2836,9 +2898,9 @@ def convert_chat_words(text):
 os.getcwd()
 os.chdir("C:/Users/gopin/Desktop/Text Processing")
 
-data = pd.read_csv("Restaurant_Reviews.csv")
+data = pd.read_csv("TotalData.csv", encoding='latin1')
 savedData = data
-data.head()
+data.shape
 
 clean_data(data)
 
