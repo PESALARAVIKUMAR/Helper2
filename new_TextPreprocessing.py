@@ -2721,7 +2721,7 @@ def clean_data(data):
     # Removing Contractions (what's --> what is, won't --> will not)
     data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
     # Replacing Negotiations with Antonmys (not able --> unable)
-    data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
+    data['Review'] = data['Review'].apply(lambda text: replace_negations(text))
     # Handle Capitalized Words (use when text not converted to LowerCase)
     #data['Review'] = data['Review'].apply(lambda text: handle_capitalized_words(text))
     # Removing Stopwords
