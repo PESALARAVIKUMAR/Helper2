@@ -2709,50 +2709,6 @@ from collections import Counter
 from bs4 import BeautifulSoup
 
 
-def clean_data(data):
-    data['Review'] = data['Review'].astype(str)
-    # Duplication controll
-    data = data.drop_duplicates(keep='first')
-    # Lower casing & replace Emails with emailaddress
-    data['Review'] = data['Review'].str.lower()
-    #data['Review'] = data['Review'].str.replace(r'^.+@[^\.].*\.[a-z]{2,}$', 'emailaddress')
-    # Removing Punctuations
-    data['Review'] = data['Review'].apply(lambda text: remove_punctuations(text))
-    # Removing Contractions (what's --> what is, won't --> will not)
-    data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
-    # Replacing Negotiations with Antonmys (not able --> unable)
-    data['Review'] = data['Review'].apply(lambda text: replace_negations(text))
-    # Handle Capitalized Words (use when text not converted to LowerCase)
-    #data['Review'] = data['Review'].apply(lambda text: handle_capitalized_words(text))
-    # Removing Stopwords
-    data['Review'] = data['Review'].apply(lambda text: remove_stopwords(text))
-    # Removing Frequent Words
-    data['Review'] = data['Review'].apply(lambda text: remove_freq_words(text))
-    # Removing Rare Words
-    #data['Review'] = data['Review'].apply(lambda text: remove_rare_words(text))
-    # Stemming
-    #data['Review'] = data['Review'].apply(lambda text: stem_words(text))
-    # Lemmatization
-    #data['Review'] = data['Review'].apply(lambda text: lemmatize_words(text))
-    # Removing Emojis
-    #data['Review'] = data['Review'].apply(lambda text: remove_emojis(text))
-    # Converting Emojis
-    data['Review'] = data['Review'].apply(lambda text: convert_emojis(text))
-    # Removing Emoticons
-    #data['Review'] = data['Review'].apply(lambda text: remove_emoticons(text))
-    # Converting Emoticons
-    data['Review'] = data['Review'].apply(lambda text: convert_emoticons(text))
-    # Removing URL's
-    data['Review'] = data['Review'].apply(lambda text: remove_urls(text))
-    # Removing HTML tags
-    data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_re(text))
-    #data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_BeautifulSoup(text))
-    # Converting Chat words
-    data['Review'] = data['Review'].apply(lambda text: convert_chat_words(text))
-    # Spelling Correction
-    
-    return data
-
 def remove_punctuations(text):
     PUNCT_TO_REMOVE = string.punctuation
     return text.translate(str.maketrans('','',PUNCT_TO_REMOVE))
@@ -2837,6 +2793,21 @@ def lemmatize_words(text):
     lemmatizer = WordNetLemmatizer()
     return " ".join(lemmatizer.lemmatize(word) for word in str(text).split())
 
+def check_emojis_emoticons_present(text):
+    emoji_pattern = re.compile("["
+                           u"\U0001F600-\U0001F64F"  # emoticons
+                           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                           u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                           u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           u"\U00002702-\U000027B0"
+                           u"\U000024C2-\U0001F251"
+                           "]+", flags=re.UNICODE)
+    if(emoji_pattern.search(text)):
+        return True
+    else:
+        return False
+#print(check_emojis_emoticons_present("game is on 🔥"))
+
 def remove_emojis(text):
     emoji_pattern = re.compile("["
                            u"\U0001F600-\U0001F64F"  # emoticons
@@ -2852,6 +2823,8 @@ def convert_emojis(text):
     for emot in UNICODE_EMO:
         text = re.sub(r'('+emot+')', "_".join(UNICODE_EMO[emot].replace(",","").replace(":","").split()), text)
     return text
+#if(check_emojis_emoticons_present("game is on 🔥")):
+#    print(convert_emojis("game is on 🔥"))
 
 def remove_emoticons(text):
     emoticon_pattern = re.compile(u'(' + u'|'.join(k for k in EMOTICONS) + u')')
@@ -2885,8 +2858,7 @@ def get_chat_words_list_dict(CHAT_WORDS):
     chat_words_list = set(chat_words_list)
     return chat_words_list,chat_words_map_dict
 
-def convert_chat_words(text):
-    chat_words_list,chat_words_map_dict = get_chat_words_list_dict(CHAT_WORDS)
+def convert_chat_words(text, chat_words_list, chat_words_map_dict):
     new_text = []
     for w in text.split():
         if w.upper() in chat_words_list:
@@ -2895,16 +2867,62 @@ def convert_chat_words(text):
             new_text.append(w)
     return " ".join(new_text)
 
+def clean_data(data):
+    data['Review'] = data['Review'].astype(str)
+    # Duplication controll
+    data = data.drop_duplicates(keep='first')
+    # Lower casing & replace Emails with emailaddress
+    data['Review'] = data['Review'].str.lower()
+    #data['Review'] = data['Review'].str.replace(r'^.+@[^\.].*\.[a-z]{2,}$', 'emailaddress')
+    # Removing URL's
+    data['Review'] = data['Review'].apply(lambda text: remove_urls(text))
+    # Removing HTML tags
+    data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_re(text))
+    #data['Review'] = data['Review'].apply(lambda text: remove_html_tags_with_BeautifulSoup(text))
+    # Removing Punctuations
+    data['Review'] = data['Review'].apply(lambda text: remove_punctuations(text))
+    # Removing Contractions (what's --> what is, won't --> will not)
+    data['Review'] = data['Review'].apply(lambda text: remove_contractions(text))
+    # Replacing Negotiations with Antonmys (not able --> unable)
+    #data['Review'] = data['Review'].apply(lambda text: replace_negations(text))
+    # Handle Capitalized Words (use when text not converted to LowerCase)
+    #data['Review'] = data['Review'].apply(lambda text: handle_capitalized_words(text))
+    # Removing Stopwords
+    data['Review'] = data['Review'].apply(lambda text: remove_stopwords(text))
+    # Removing Frequent Words
+    #data['Review'] = data['Review'].apply(lambda text: remove_freq_words(text))
+    # Removing Rare Words
+    #data['Review'] = data['Review'].apply(lambda text: remove_rare_words(text))
+    # Stemming
+    #data['Review'] = data['Review'].apply(lambda text: stem_words(text))
+    # Lemmatization
+    #data['Review'] = data['Review'].apply(lambda text: lemmatize_words(text))
+    # Removing Emojis
+    #data['Review'] = data['Review'].apply(lambda text: remove_emojis(text))
+    # Converting Emojis
+    data['Review'] = data['Review'].apply(lambda text: convert_emojis(text) if(check_emojis_emoticons_present(text)) else text)
+    # Removing Emoticons
+    #data['Review'] = data['Review'].apply(lambda text: remove_emoticons(text))
+    # Converting Emoticons
+    data['Review'] = data['Review'].apply(lambda text: convert_emoticons(text) if(check_emojis_emoticons_present(text)) else text)
+    # Converting Chat words
+    chat_words_list, chat_words_map_dict = get_chat_words_list_dict(CHAT_WORDS)
+    data['Review'] = data['Review'].apply(lambda text: convert_chat_words(text, chat_words_list, chat_words_map_dict))
+        
+    return data
+
+
 os.getcwd()
 os.chdir("C:/Users/gopin/Desktop/Text Processing")
+os.chdir("C:/Users/gopin/Anaconda3")
+
 
 data = pd.read_csv("TotalData.csv", encoding='latin1')
 savedData = data
 data.shape
 
-clean_data(data)
-
-
+data = clean_data(data)
+data.shape
 
 
 
